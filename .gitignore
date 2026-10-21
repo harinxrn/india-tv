@@ -1,0 +1,4 @@
+build/
+test-data/
+*.apk
+*.muse-github-snapshot-sync.json
