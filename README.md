@@ -2,6 +2,14 @@
 
 A minimal Android TV app for watching live Indian TV channels, built for the remote first. Channels come from the free [iptv-org](https://github.com/iptv-org/iptv) playlists and refresh inside the app, so the lists stay current without an app update.
 
+## Preview
+
+![Home screen - Malayalam News](docs/preview-home.svg)
+
+![Player](docs/preview-player.svg)
+
+_Interface illustrations drawn from the app's actual layouts and channel data._
+
 ## Features
 
 - **Malayalam News home page** — the app opens on a grid of Malayalam news channels (Asianet News, Manorama News, Mathrubhumi News, 24 News, Reporter, Media One, News18 Kerala, Kairali News, Janam TV and more). Each tile can carry a custom YouTube Live link: press OK to watch on YouTube inside the app, hold OK to add/edit the link or fall back to the channel's IPTV stream.
