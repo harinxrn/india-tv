@@ -17,11 +17,13 @@ A minimal Android TV app for watching live Malayalam TV, built for the remote fi
 
 ## Preview
 
+![Kerala Tv on a TV](docs/Kerala%20Tv%20promo%20-%20app%20on%20a%20TV.png)
+
 ![Home screen - YT News](docs/screenshot-home.png)
 
 ![Player](docs/preview-player.svg)
 
-_Home screen: real screenshot from the TV. Player: interface illustration drawn from the app's actual layout._
+_Shown on a TV: the real home screen. Below: the home screen itself, and the player as an interface illustration._
 
 ## Features
 
