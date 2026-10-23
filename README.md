@@ -15,10 +15,6 @@
 
 A minimal Android TV app for watching live Malayalam TV, built for the remote first. Channels come from the free [iptv-org](https://github.com/iptv-org/iptv) playlists and refresh inside the app, so the lists stay current without an app update.
 
-**v2.5.1 (2026-10-23): new logo.** A palm + retro TV logo (launcher icon and TV banner) replaces the v2.5 tile art; everything else is identical to v2.5. This is the current stable build.
-
-**v2.5 (2026-10-23): Malayalam only, two sections, Apple TV-style UI.** Everything that is not Malayalam was removed (v2.0); v2.5 adds the video-only YouTube embed, the quality toggle + lip-sync watchdog, and new logo art.
-
 ## Preview
 
 ![Home screen - YT News](docs/screenshot-home.png)
