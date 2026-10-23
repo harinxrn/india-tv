@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Android-5.0%2B-3DDC84" alt="Android 5.0+">
 </p>
 
-A minimal Android TV app for watching live Malayalam TV, built for the remote first. Channels come from the free [iptv-org](https://github.com/iptv-org/iptv) playlists and refresh inside the app, so the lists stay current without an app update.
+A minimal Android TV app for watching live Malayalam TV, built for the remote first. Channels come from YouTube Lives and the free [iptv-org](https://github.com/iptv-org/iptv) playlists and refresh inside the app, so the lists stay current without an app update.
 
 ## Preview
 
