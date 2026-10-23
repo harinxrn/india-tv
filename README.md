@@ -6,11 +6,11 @@ A minimal Android TV app for watching live Malayalam TV, built for the remote fi
 
 ## Preview
 
-![Home screen - Malayalam News](docs/preview-home.svg)
+![Home screen - YT News](docs/screenshot-home.png)
 
 ![Player](docs/preview-player.svg)
 
-_Interface illustrations drawn from the app's actual layouts and channel data._
+_Home screen: real screenshot from the TV. Player: interface illustration drawn from the app's actual layout._
 
 ## Features
 
