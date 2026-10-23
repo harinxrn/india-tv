@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#23232E"/><stop offset="1" stop-color="#101014"/></linearGradient></defs><rect width="1280" height="720" fill="url(#g)"/><circle cx="640" cy="330" r="210" fill="#2C2C3A"/><circle cx="640" cy="330" r="150" fill="#3A3A50"/><rect x="240" y="470" width="800" height="26" rx="6" fill="#FF8A1A" opacity="0.85"/><rect x="240" y="512" width="560" height="16" rx="6" fill="#4A4A58"/><text x="640" y="345" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="40" font-weight="bold" fill="#F5F5F7">LIVE</text><text x="48" y="640" font-family="DejaVu Sans, Arial" font-size="28" font-weight="bold" fill="#FFFFFF">Asianet News - YouTube Live</text><text x="48" y="672" font-family="DejaVu Sans, Arial" font-size="15" fill="#C9C9CF">Up/Down next / prev channel - OK pause - Back exit</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="vid" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#233246"/><stop offset="1" stop-color="#0C1420"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000000" stop-opacity="0"/><stop offset="0.45" stop-color="#000000" stop-opacity="0.5"/><stop offset="1" stop-color="#000000" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#vid)"/>
+  <text x="640" y="330" font-family="sans-serif" font-size="22" fill="#FFFFFF" fill-opacity="0.35" text-anchor="middle">live video</text>
+  <rect x="0" y="470" width="1280" height="250" fill="url(#fade)"/>
+  <rect x="48" y="566" width="64" height="64" rx="10" fill="#1B1D23" stroke="#2B2E36"/>
+  <rect x="130" y="560" width="52" height="20" rx="6" fill="#FF3B30"/>
+  <text x="142" y="575" font-family="sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF">LIVE</text>
+  <text x="192" y="575" font-family="sans-serif" font-size="13" fill="#C9C9CF">YT News  -  YouTube Live  -  1 of 11</text>
+  <text x="130" y="616" font-family="sans-serif" font-size="28" font-weight="bold" fill="#FFFFFF">Asianet News - YouTube Live</text>
+  <text x="130" y="644" font-family="sans-serif" font-size="13" fill="#9A9AA3">Up / Down - next channel   -   OK - pause   -   Left / Right - info   -   Back - exit</text>
+  <text x="48" y="694" font-family="sans-serif" font-size="12" fill="#6E6E76">v2.0 preview - drawn from the v2 player layout.</text>
+</svg>

@@ -119,6 +119,7 @@ public class YtResolver {
             // Layer 2: Innertube player API, client ladder.
             // {clientNum, clientVersion, clientJson}
             String[][] clients = {
+                    {"85", "2.0", "\"clientName\":\"TVHTML5_SIMPLY_EMBEDDED_PLAYER\",\"clientVersion\":\"2.0\""},
                     {"7", "7.20250205.16.00", "\"clientName\":\"TVHTML5\",\"clientVersion\":\"7.20250205.16.00\""},
                     {"28", "1.65.10", "\"clientName\":\"ANDROID_VR\",\"clientVersion\":\"1.65.10\",\"deviceMake\":\"Oculus\",\"deviceModel\":\"Quest 3\",\"androidSdkVersion\":32,\"osName\":\"Android\",\"osVersion\":\"12\""},
                     {"2", "2.20250204.07.00", "\"clientName\":\"MWEB\",\"clientVersion\":\"2.20250204.07.00\""},
@@ -135,11 +136,68 @@ public class YtResolver {
         }
     }
 
+    private static final Pattern HANDLE = Pattern.compile("@([A-Za-z0-9._\\-]{3,})");
+    private static final Pattern CHANNEL_ID = Pattern.compile("youtube\\.com/channel/(UC[A-Za-z0-9_\\-]{10,})");
+
+    /**
+     * v2 self-healing rule: store the CHANNEL, never a single video.
+     * Any input that names a channel (@handle page, /live page, channel page)
+     * is normalized to that channel's permanent /live URL, which always
+     * points at whatever the channel is streaming right now. A bare video
+     * link (watch?v= / /live/VIDEOID) has no channel in it, so it is kept
+     * as-is - it will work until that one stream ends.
+     */
+    public static String normalizeToLiveUrl(String input) {
+        if (input == null) return "";
+        String u = input.trim();
+        if (u.length() == 0 || u.endsWith(".m3u8")) return u;
+        Matcher cm = CHANNEL_ID.matcher(u);
+        if (cm.find()) return "https://www.youtube.com/channel/" + cm.group(1) + "/live";
+        Matcher hm = HANDLE.matcher(u);
+        if (hm.find()) return "https://www.youtube.com/@" + hm.group(1) + "/live";
+        return u;
+    }
+
+    /** Current live video id for a channel /live URL, fetched fresh. Null if the channel is not live now. */
+    public static String liveVideoId(String liveUrl) {
+        if (liveUrl == null) return null;
+        // Only the canonical lookup is meaningful for /live pages; a direct
+        // id in the string would be one specific (possibly ended) stream.
+        String html = fetchText(liveUrl.trim(), 1500 * 1024);
+        if (html == null) return null;
+        Matcher m = CANONICAL.matcher(html);
+        if (m.find()) return m.group(1);
+        return null;
+    }
+
+    /** Light validation: the manifest must answer 200 and look like HLS. */
+    public static boolean isPlayableHls(String urlStr) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", DESKTOP_UA);
+            if (conn.getResponseCode() != 200) return false;
+            BufferedReader r = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            char[] buf = new char[2048];
+            int n = r.read(buf);
+            r.close();
+            if (n <= 0) return false;
+            return new String(buf, 0, n).contains("#EXTM3U");
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     private static String innertube(String apiKey, String visitorData, String clientNum, String clientVersion, String clientJson, String sts, String videoId) {
         HttpURLConnection conn = null;
         try {
             String body = "{\"context\":{\"client\":{" + clientJson + ",\"hl\":\"en\"}"
-                    + (clientJson.contains("WEB_EMBEDDED_PLAYER")
+                    + (clientJson.contains("EMBEDDED")
                         ? ",\"thirdParty\":{\"embedUrl\":\"https://www.youtube.com/embed/" + videoId + "\"}" : "")
                     + "},\"videoId\":\"" + videoId + "\""
                     + ",\"playbackContext\":{\"contentPlaybackContext\":{\"signatureTimestamp\":" + sts + "}}"

@@ -15,6 +15,9 @@ public class Channel {
     public boolean malayalam;
     public boolean sports;
     public boolean movies;
+    /** For YouTube playback: the channel's permanent /live page (handle URL).
+     *  Never a one-off video link - the current video id is resolved fresh. */
+    public String ytLiveUrl;
 
     public void recomputeFlags() {
         for (String g : groups) {

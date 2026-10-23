@@ -6,7 +6,6 @@ import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -18,9 +17,7 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.GridView;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,62 +37,90 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
+import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * IndiaTV v2 - Malayalam only.
+ * Two sections: "YT News" (startup; YouTube Live per channel, self-healing)
+ * and "TV" (Malayalam IPTV channels only, from iptv-org, allowlist-filtered).
+ */
 public class MainActivity extends Activity {
 
     private static final String[] SOURCES = {
             "https://iptv-org.github.io/iptv/countries/in.m3u",
-            "https://iptv-org.github.io/iptv/languages/mal.m3u",
-            "https://iptv-org.github.io/iptv/categories/sports.m3u",
-            "https://iptv-org.github.io/iptv/categories/movies.m3u"
+            "https://iptv-org.github.io/iptv/languages/mal.m3u"
     };
-    private static final String[] GROUP_ORDER = {
-            "News", "Entertainment", "Music", "Kids", "Religious", "General",
-            "Documentary", "Series", "Business", "Education", "Lifestyle", "Animation"
-    };
-    private static final String HOME = "Malayalam News";
+
+    public static final String SECTION_NEWS = "YT News";
+    public static final String SECTION_TV = "TV";
+
+    // YT News tiles, in the order Hari sent the links (Big TV 10th, Jaihind 11th).
     private static final String[] CURATED_NEWS = {
             "Asianet News", "Manorama News", "Mathrubhumi News", "24 News", "Reporter TV",
-            "Media One", "News18 Kerala", "Kairali News", "Janam TV", "Raj News Malayalam",
-            "Jaihind TV", "Real News Kerala", "Big TV 24x7"
+            "Media One", "News18 Kerala", "Kairali News", "Janam TV", "Big TV 24x7",
+            "Jaihind TV"
     };
-    // Prefilled YouTube Live pages (channel /live URLs). Hari can override
-    // any of these per channel with a long-press; stored values win.
+
+    // Verified 2026-10-23 via YouTube oEmbed from Hari's own links
+    // (see yt-news-channels.md). Store ONLY the handle /live URL.
     private static final Map<String, String> DEFAULT_YT = new HashMap<String, String>();
     static {
-        // Handles verified reachable (HTTP 200 on the /live page) on 2026-10-21.
-        DEFAULT_YT.put("asianet news", "https://www.youtube.com/@AsianetNews/live");
-        DEFAULT_YT.put("manorama news", "https://www.youtube.com/@ManoramaNews/live");
-        DEFAULT_YT.put("news18 kerala", "https://www.youtube.com/@News18Kerala/live");
-        DEFAULT_YT.put("24 news", "https://www.youtube.com/@24NewsChannel/live");
+        DEFAULT_YT.put("asianet news", "https://www.youtube.com/@asianetnews/live");
+        DEFAULT_YT.put("manorama news", "https://www.youtube.com/@manoramanews/live");
+        DEFAULT_YT.put("mathrubhumi news", "https://www.youtube.com/@TVMathrubhumi/live");
+        DEFAULT_YT.put("24 news", "https://www.youtube.com/@24OnLive/live");
         DEFAULT_YT.put("reporter tv", "https://www.youtube.com/@reporterlive/live");
-        DEFAULT_YT.put("media one", "https://www.youtube.com/@MediaOneNews/live");
-        DEFAULT_YT.put("janam tv", "https://www.youtube.com/@JanamTV/live");
-        DEFAULT_YT.put("kairali news", "https://www.youtube.com/@KairaliNews/live");
+        DEFAULT_YT.put("media one", "https://www.youtube.com/@MediaoneTVLive/live");
+        DEFAULT_YT.put("news18 kerala", "https://www.youtube.com/@News18Kerala/live");
+        DEFAULT_YT.put("kairali news", "https://www.youtube.com/@kairalinews/live");
+        DEFAULT_YT.put("janam tv", "https://www.youtube.com/@tvjanam/live");
+        DEFAULT_YT.put("big tv 24x7", "https://www.youtube.com/@bigtv24x7live/live");
+        DEFAULT_YT.put("jaihind tv", "https://www.youtube.com/@JaihindNewslive/live");
+    }
+
+    // The only TV channels v2 keeps: true Malayalam channels present in
+    // iptv-org (in.m3u / mal.m3u, checked fresh 2026-10-23). Everything else
+    // in those playlists (other languages, or Malayalam-audio tracks of
+    // pan-India / foreign channels) is dropped.
+    private static final Set<String> ALLOW = new HashSet<String>();
+    static {
+        String[] a = {
+                "24 news", "amrita tv", "anand tv", "asianet", "asianet hd", "asianet middle east",
+                "asianet movies", "asianet movies hd", "asianet news", "big tv 24x7", "c malayalam tv",
+                "darshana tv", "dd malayalam", "flowers tv", "flowers tv usa", "garshom tv",
+                "goodness tv", "harvest tv", "harvest tv keralam", "jaihind tv",
+                "janam tv", "jeevan tv", "kairali arabia", "kairali news", "kairali tv",
+                "kairali we", "kalika tv", "kappa tv", "kaumudy tv", "kerala vision",
+                "kite victers", "kcl tv", "magnavision tv", "manorama news",
+                "mathrubhumi news", "mazhavil manorama", "mazhavil manorama hd", "media one", "news18 kerala",
+                "powervision tv", "pravasi channel", "pulari tv", "raj musix malayalam",
+                "raj news malayalam", "real news kerala", "reporter tv", "safari tv",
+                "shalom", "shekinah tv", "sun surya", "sun surya hd", "surya tv", "utv palakkad"
+        };
+        for (String s : a) ALLOW.add(s);
     }
 
     private GridView grid;
-    private LinearLayout chipRow;
-    private HorizontalScrollView chipScroll;
     private TextView status;
     private TextView countLabel;
+    private TextView sectionSub;
+    private TextView tabNews;
+    private TextView tabTv;
     private ProgressBar loading;
     private ChannelAdapter adapter;
     private SharedPreferences prefs;
 
-    private List<Channel> rawAll = new ArrayList<Channel>();
-    private List<Channel> all = new ArrayList<Channel>();
+    private List<Channel> tvList = new ArrayList<Channel>();
     private List<Channel> newsTiles = new ArrayList<Channel>();
-    private LinkedHashMap<String, List<Channel>> cats = new LinkedHashMap<String, List<Channel>>();
-    private String currentCat = "";
-    private View currentChip;
+    private String currentSection = SECTION_NEWS;
     private View lastScaled;
     private boolean busy = false;
+    private boolean liveCheckRunning = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,13 +128,17 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         prefs = getSharedPreferences("ytlinks", MODE_PRIVATE);
         grid = (GridView) findViewById(R.id.grid);
-        chipRow = (LinearLayout) findViewById(R.id.chipRow);
-        chipScroll = (HorizontalScrollView) chipRow.getParent();
         status = (TextView) findViewById(R.id.status);
         countLabel = (TextView) findViewById(R.id.countLabel);
+        sectionSub = (TextView) findViewById(R.id.sectionSub);
+        tabNews = (TextView) findViewById(R.id.tabNews);
+        tabTv = (TextView) findViewById(R.id.tabTv);
         loading = (ProgressBar) findViewById(R.id.loading);
         adapter = new ChannelAdapter();
         grid.setAdapter(adapter);
+
+        setupTab(tabNews, SECTION_NEWS);
+        setupTab(tabTv, SECTION_TV);
 
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -117,9 +146,9 @@ public class MainActivity extends Activity {
                 List<Channel> list = adapter.data;
                 if (list == null || position >= list.size()) return;
                 Channel c = list.get(position);
-                if (HOME.equals(currentCat)) {
+                if (SECTION_NEWS.equals(currentSection)) {
                     String yt = effectiveYt(c);
-                    if (yt != null && yt.length() > 0) {
+                    if (yt.length() > 0) {
                         playYouTube(c, yt, list, position);
                         return;
                     }
@@ -130,7 +159,7 @@ public class MainActivity extends Activity {
         grid.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                if (!HOME.equals(currentCat)) return false;
+                if (!SECTION_NEWS.equals(currentSection)) return false;
                 List<Channel> list = adapter.data;
                 if (list == null || position >= list.size()) return false;
                 showNewsMenu(list.get(position), position);
@@ -140,16 +169,20 @@ public class MainActivity extends Activity {
         grid.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (view == null) return;
-                if (lastScaled != null && lastScaled != view) {
-                    lastScaled.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
-                }
-                view.animate().scaleX(1.09f).scaleY(1.09f).setDuration(150).start();
-                lastScaled = view;
+                scaleCard(view);
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        grid.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    View sel = grid.getChildAt(grid.getSelectedItemPosition() - grid.getFirstVisiblePosition());
+                    if (sel != null) scaleCard(sel);
+                }
             }
         });
         grid.setOnKeyListener(new View.OnKeyListener() {
@@ -157,9 +190,8 @@ public class MainActivity extends Activity {
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN
                         && keyCode == KeyEvent.KEYCODE_DPAD_UP
-                        && grid.getSelectedItemPosition() < 5
-                        && currentChip != null) {
-                    currentChip.requestFocus();
+                        && grid.getSelectedItemPosition() < 4) {
+                    (SECTION_NEWS.equals(currentSection) ? tabNews : tabTv).requestFocus();
                     return true;
                 }
                 return false;
@@ -173,43 +205,120 @@ public class MainActivity extends Activity {
                 loadData(true);
             }
         });
-        refresh.setOnKeyListener(downToGrid());
-
-        loadData(false);
-    }
-
-    private View.OnKeyListener downToGrid() {
-        return new View.OnKeyListener() {
+        refresh.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                     grid.requestFocus();
                     return true;
                 }
+                if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    tabTv.requestFocus();
+                    return true;
+                }
                 return false;
             }
-        };
+        });
+
+        loadData(false);
     }
 
-    private void playIptv(List<Channel> list, int position) {
-        AppData.playList = list;
-        AppData.playIndex = position;
-        AppData.playTitle = currentCat;
-        startActivity(new Intent(MainActivity.this, PlayerActivity.class));
+    private void scaleCard(View view) {
+        if (view == null) return;
+        if (lastScaled != null && lastScaled != view) {
+            lastScaled.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+        }
+        view.animate().scaleX(1.10f).scaleY(1.10f).setDuration(150).start();
+        lastScaled = view;
     }
 
-    // ---------- HD filter ----------
+    // ---------- tabs (the only two sections) ----------
 
-    private static final Pattern HD_TOKEN = Pattern.compile("(^|[^A-Z0-9])HD([^A-Z0-9]|$)");
-    private static final Pattern UHD_TOKEN = Pattern.compile("(^|[^A-Z0-9])(UHD|4K)([^A-Z0-9]|$)");
-
-    static boolean isHd(Channel c) {
-        String u = c.name.toUpperCase();
-        if (u.contains("720P") || u.contains("1080P") || u.contains("1440P") || u.contains("2160P")) return true;
-        if (HD_TOKEN.matcher(u).find()) return true;
-        if (UHD_TOKEN.matcher(u).find()) return true;
-        return false;
+    private void setupTab(final TextView t, final String section) {
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                selectSection(section);
+                grid.requestFocus();
+            }
+        });
+        t.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View view, boolean hasFocus) {
+                if (hasFocus) selectSection(section);
+                updateTabs();
+            }
+        });
+        t.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    grid.requestFocus();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && t == tabNews) {
+                    tabTv.requestFocus();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && t == tabTv) {
+                    tabNews.requestFocus();
+                    return true;
+                }
+                return false;
+            }
+        });
     }
+
+    private void styleTab(TextView t, boolean selected, boolean focused) {
+        if (selected) {
+            t.setBackgroundResource(R.drawable.tab_selected);
+            t.setTextColor(0xFF0B0B0F);
+        } else if (focused) {
+            t.setBackgroundResource(R.drawable.tab_focused);
+            t.setTextColor(0xFFFFFFFF);
+        } else {
+            t.setBackgroundResource(R.drawable.tab_plain);
+            t.setTextColor(0xFFC9CAD1);
+        }
+        t.setScaleX(selected || focused ? 1.04f : 1f);
+        t.setScaleY(selected || focused ? 1.04f : 1f);
+    }
+
+    private void updateTabs() {
+        styleTab(tabNews, SECTION_NEWS.equals(currentSection), tabNews.hasFocus());
+        styleTab(tabTv, SECTION_TV.equals(currentSection), tabTv.hasFocus());
+    }
+
+    private void selectSection(String section) {
+        if (section.equals(currentSection) && adapter.data != null && adapter.data.size() > 0
+                && ((SECTION_NEWS.equals(section) && adapter.data == newsTiles)
+                || (SECTION_TV.equals(section) && adapter.data == tvList))) {
+            updateTabs();
+            return;
+        }
+        currentSection = section;
+        if (lastScaled != null) {
+            lastScaled.setScaleX(1f);
+            lastScaled.setScaleY(1f);
+            lastScaled = null;
+        }
+        List<Channel> list = SECTION_NEWS.equals(section) ? newsTiles : tvList;
+        adapter.setData(list);
+        if (list.size() > 0) grid.setSelection(0);
+        if (SECTION_NEWS.equals(section)) {
+            countLabel.setText(list.size() + " channels");
+            sectionSub.setText("Live news on YouTube - checked fresh every open. Hold OK for IPTV / link options.");
+        } else {
+            countLabel.setText(list.size() + " channels");
+            sectionSub.setText("Malayalam channels - live TV streams.");
+        }
+        updateTabs();
+    }
+
+    // ---------- naming / quality ----------
 
     static String baseName(String name) {
         int p = name.indexOf(" (");
@@ -217,6 +326,51 @@ public class MainActivity extends Activity {
         int b2 = b.indexOf(" [");
         if (b2 > 0) b = b.substring(0, b2);
         return b.trim();
+    }
+
+    /** Dedupe key: base name without a trailing HD marker (Mazhavil Manorama vs HD are one channel). */
+    static String dedupeKey(String name) {
+        String b = baseName(name).toLowerCase();
+        if (b.endsWith(" hd")) b = b.substring(0, b.length() - 3);
+        return b;
+    }
+
+    static int qualityScore(Channel c) {
+        String u = c.name.toUpperCase();
+        int score = 0;
+        if (u.contains("2160")) score = 400;
+        else if (u.contains("1440")) score = 300;
+        else if (u.contains("1080")) score = 200;
+        else if (u.contains("720")) score = 100;
+        else if (u.contains("576")) score = 60;
+        else if (u.contains("504")) score = 50;
+        else if (u.contains("480")) score = 40;
+        else if (u.contains("396") || u.contains("360")) score = 30;
+        if (u.contains("HD")) score += 10;
+        return score;
+    }
+
+    static String qualityLabel(Channel c) {
+        String u = c.name.toUpperCase();
+        if (u.contains("1080")) return "1080p";
+        if (u.contains("720")) return "720p";
+        if (u.contains("576")) return "576p";
+        if (u.contains("504")) return "504p";
+        if (u.contains("480")) return "480p";
+        if (u.contains("HD")) return "HD";
+        return "SD";
+    }
+
+    private void playIptv(List<Channel> list, int position) {
+        Channel c = list.get(position);
+        if (c.url == null || c.url.length() == 0) {
+            Toast.makeText(this, baseName(c.name) + " has no TV stream - YouTube only", Toast.LENGTH_LONG).show();
+            return;
+        }
+        AppData.playList = list;
+        AppData.playIndex = position;
+        AppData.playTitle = currentSection;
+        startActivity(new Intent(MainActivity.this, PlayerActivity.class));
     }
 
     // ---------- data loading ----------
@@ -234,7 +388,7 @@ public class MainActivity extends Activity {
         }
         loading.setVisibility(View.VISIBLE);
         status.setVisibility(View.VISIBLE);
-        status.setText("Loading channels from iptv-org…");
+        status.setText("Loading Malayalam channels...");
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -248,11 +402,11 @@ public class MainActivity extends Activity {
                             writeCache(merged);
                             status.setVisibility(View.GONE);
                             applyData(merged);
-                        } else if (rawAll.size() > 0) {
+                        } else if (tvList.size() > 0 || newsTiles.size() > 0) {
                             status.setVisibility(View.GONE);
-                            Toast.makeText(MainActivity.this, "Refresh failed — showing saved channels", Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this, "Refresh failed - showing saved channels", Toast.LENGTH_LONG).show();
                         } else {
-                            status.setText("Could not load channels. Check the TV's internet, then press Refresh.");
+                            status.setText("Could not load channels. Check the TV internet, then press Refresh.");
                         }
                     }
                 });
@@ -273,8 +427,7 @@ public class MainActivity extends Activity {
                 in.close();
                 conn.disconnect();
                 for (Channel c : list) {
-                    if (s == 0) c.india = true;
-                    if (s == 1) c.malayalam = true;
+                    c.malayalam = true;
                     c.recomputeFlags();
                     Channel existing = byUrl.get(c.url);
                     if (existing == null) byUrl.put(c.url, c);
@@ -288,10 +441,10 @@ public class MainActivity extends Activity {
         return new ArrayList<Channel>(byUrl.values());
     }
 
-    // ---------- cache (simple TSV, stores the RAW merged list) ----------
+    // ---------- cache (v2 file, RAW merged list) ----------
 
     private File cacheFile() {
-        return new File(getFilesDir(), "channels.tsv");
+        return new File(getFilesDir(), "channels-v2.tsv");
     }
 
     private List<Channel> readCache() {
@@ -312,8 +465,7 @@ public class MainActivity extends Activity {
                 if (p[3].length() > 0) {
                     for (String g : p[3].split(";")) c.groups.add(g);
                 }
-                c.india = "1".equals(p[4]);
-                c.malayalam = "1".equals(p[5]);
+                c.malayalam = true;
                 if (p.length > 6 && p[6].length() > 0) {
                     for (String kv : p[6].split("&")) {
                         int eq = kv.indexOf('=');
@@ -345,7 +497,7 @@ public class MainActivity extends Activity {
                             if (i > 0) sb.append(';');
                             sb.append(c.groups.get(i));
                         }
-                        sb.append('\t').append(c.india ? '1' : '0').append('\t').append(c.malayalam ? '1' : '0').append('\t');
+                        sb.append('\t').append('0').append('\t').append('1').append('\t');
                         boolean first = true;
                         for (Map.Entry<String, String> e : c.headers.entrySet()) {
                             if (!first) sb.append('&');
@@ -362,235 +514,166 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    // ---------- categories + UI ----------
+    // ---------- build the two sections ----------
 
     private void applyData(List<Channel> raw) {
-        rawAll = raw;
-        all = new ArrayList<Channel>();
-        for (Channel c : rawAll) {
-            if (isHd(c)) all.add(c);
+        // TV: allowlist only, deduped by channel, best quality wins.
+        LinkedHashMap<String, Channel> bestTv = new LinkedHashMap<String, Channel>();
+        for (Channel c : raw) {
+            if (!ALLOW.contains(baseName(c.name).toLowerCase())) continue;
+            String key = dedupeKey(c.name);
+            Channel prev = bestTv.get(key);
+            if (prev == null || qualityScore(c) > qualityScore(prev)) bestTv.put(key, c);
         }
-        buildNewsTiles();
-
-        cats.clear();
-        List<Channel> mal = new ArrayList<Channel>();
-        List<Channel> sports = new ArrayList<Channel>();
-        List<Channel> movies = new ArrayList<Channel>();
-        List<Channel> india = new ArrayList<Channel>();
-        for (Channel c : all) {
-            if (c.malayalam) mal.add(c);
-            if (c.sports) sports.add(c);
-            if (c.movies) movies.add(c);
-            if (c.india) india.add(c);
-        }
-        if (!mal.isEmpty()) cats.put("Malayalam", mal);
-        if (!sports.isEmpty()) cats.put("Sports", sports);
-        if (!movies.isEmpty()) cats.put("Movies", movies);
-        if (!india.isEmpty()) cats.put("India", india);
-        for (String g : GROUP_ORDER) {
-            List<Channel> gl = new ArrayList<Channel>();
-            for (Channel c : all) {
-                for (String cg : c.groups) {
-                    if (cg.equalsIgnoreCase(g)) { gl.add(c); break; }
-                }
-            }
-            if (gl.size() >= 3 && !cats.containsKey(g)) cats.put(g, gl);
-        }
-        cats.put("All Channels", all);
-
-        Comparator<Channel> byName = new Comparator<Channel>() {
+        tvList = new ArrayList<Channel>(bestTv.values());
+        Collections.sort(tvList, new Comparator<Channel>() {
             @Override
             public int compare(Channel a, Channel b) {
-                return a.name.compareToIgnoreCase(b.name);
-            }
-        };
-        for (List<Channel> l : cats.values()) Collections.sort(l, byName);
-
-        buildChips();
-        if (!newsTiles.isEmpty()) selectCategory(HOME);
-        else selectCategory(cats.keySet().iterator().next());
-        if (currentChip != null) currentChip.requestFocus();
-    }
-
-    private void buildNewsTiles() {
-        LinkedHashMap<String, Channel> best = new LinkedHashMap<String, Channel>();
-        for (Channel c : rawAll) {
-            if (!c.malayalam) continue;
-            boolean isNews = false;
-            for (String g : c.groups) if (g.equalsIgnoreCase("News")) { isNews = true; break; }
-            String base = baseName(c.name);
-            boolean curated = false;
-            for (String n : CURATED_NEWS) if (n.equalsIgnoreCase(base)) { curated = true; break; }
-            if (!isNews && !curated) continue;
-            Channel prev = best.get(base.toLowerCase());
-            if (prev == null || (isHd(c) && !isHd(prev))) best.put(base.toLowerCase(), c);
-        }
-        newsTiles = new ArrayList<Channel>(best.values());
-        Collections.sort(newsTiles, new Comparator<Channel>() {
-            @Override
-            public int compare(Channel a, Channel b) {
-                int ia = curatedIndex(baseName(a.name));
-                int ib = curatedIndex(baseName(b.name));
-                if (ia != ib) return ia - ib;
-                return a.name.compareToIgnoreCase(b.name);
+                return baseName(a.name).compareToIgnoreCase(baseName(b.name));
             }
         });
-    }
 
-    private static int curatedIndex(String base) {
-        for (int i = 0; i < CURATED_NEWS.length; i++) {
-            if (CURATED_NEWS[i].equalsIgnoreCase(base)) return i;
-        }
-        return 1000;
-    }
-
-    private void buildChips() {
-        chipRow.removeAllViews();
-        TextView search = makeChip("⌕ Search", false);
-        search.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showSearch();
+        // YT News: curated order; IPTV stream (if any) is kept as the fallback.
+        newsTiles = new ArrayList<Channel>();
+        for (String name : CURATED_NEWS) {
+            Channel match = bestTv.get(dedupeKey(name));
+            if (match != null) {
+                newsTiles.add(match);
+            } else {
+                Channel synthetic = new Channel();
+                synthetic.name = name;
+                synthetic.url = "";
+                synthetic.logo = "";
+                newsTiles.add(synthetic);
             }
-        });
-        chipRow.addView(search);
-        if (!newsTiles.isEmpty()) {
-            chipRow.addView(makeChip(HOME, true));
         }
-        for (final String name : cats.keySet()) {
-            chipRow.addView(makeChip(name, true));
-        }
+
+        currentSection = "";
+        adapter.data = new ArrayList<Channel>();
+        selectSection(SECTION_NEWS);
+        tabNews.requestFocus();
+        refreshLiveStatus();
     }
 
-    private TextView makeChip(final String text, final boolean isCategory) {
-        final TextView t = new TextView(this);
-        t.setText(text);
-        t.setTextColor(0xFFF5F5F7);
-        t.setTextSize(15);
-        t.setBackgroundResource(R.drawable.chip_bg);
-        t.setFocusable(true);
-        t.setClickable(true);
-        int h = (int) (16 * getResources().getDisplayMetrics().density);
-        int v = (int) (8 * getResources().getDisplayMetrics().density);
-        t.setPadding(h, v, h, v);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, (int) (10 * getResources().getDisplayMetrics().density), 0);
-        t.setLayoutParams(lp);
-        t.setOnKeyListener(downToGrid());
-        if (isCategory) {
-            t.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    selectCategory(text);
-                    grid.requestFocus();
-                }
-            });
-            t.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean hasFocus) {
-                    if (hasFocus) {
-                        selectCategory(text);
-                        Rect r = new Rect();
-                        t.getDrawingRect(r);
-                        chipRow.offsetDescendantRectToMyCoords(t, r);
-                        chipScroll.requestChildRectangleOnScreen(chipRow, r, false);
-                    }
-                }
-            });
-        }
-        return t;
-    }
-
-    private void markSelectedChip() {
-        currentChip = null;
-        for (int i = 0; i < chipRow.getChildCount(); i++) {
-            TextView t = (TextView) chipRow.getChildAt(i);
-            boolean sel = t.getText().toString().equals(currentCat);
-            t.setSelected(sel);
-            if (sel) currentChip = t;
-        }
-    }
-
-    private void selectCategory(String name) {
-        List<Channel> list;
-        if (HOME.equals(name)) list = newsTiles;
-        else list = cats.get(name);
-        if (list == null) return;
-        boolean same = name.equals(currentCat);
-        currentCat = name;
-        if (!same) {
-            if (lastScaled != null) {
-                lastScaled.setScaleX(1f);
-                lastScaled.setScaleY(1f);
-                lastScaled = null;
-            }
-            adapter.setData(list);
-            if (list.size() > 0) grid.setSelection(0);
-        }
-        if (HOME.equals(name)) {
-            countLabel.setText(list.size() + " news channels • YouTube + IPTV");
-            status.setText("OK = play (YouTube if a link is set, else IPTV) • Hold OK = options / add YouTube link • ▶YT = YouTube set");
-            status.setVisibility(View.VISIBLE);
-        } else {
-            countLabel.setText(list.size() + " channels • HD only");
-            status.setVisibility(View.GONE);
-        }
-        markSelectedChip();
-    }
-
-    private void showSearch() {
-        final EditText input = new EditText(this);
-        input.setHint("Channel name");
-        new AlertDialog.Builder(this)
-                .setTitle("Search HD channels")
-                .setView(input)
-                .setPositiveButton("Search", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        String q = input.getText().toString().trim().toLowerCase();
-                        if (q.length() == 0) return;
-                        List<Channel> res = new ArrayList<Channel>();
-                        for (Channel c : all) {
-                            if (c.name.toLowerCase().contains(q)) res.add(c);
-                        }
-                        if (res.isEmpty()) {
-                            Toast.makeText(MainActivity.this, "No HD channels match '" + q + "'", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        currentCat = "Search";
-                        adapter.setData(res);
-                        countLabel.setText(res.size() + " results for '" + q + "'");
-                        status.setVisibility(View.GONE);
-                        markSelectedChip();
-                        grid.requestFocus();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    // ---------- Malayalam News: YouTube links ----------
+    // ---------- YouTube self-healing ----------
 
     private String ytKey(Channel c) {
         return "yt_" + baseName(c.name).toLowerCase();
     }
 
-    /** Effective YouTube link: user's saved value wins; "" means user cleared it; else the prefilled default. */
+    /** Saved (normalized) channel link wins; "" means cleared; else the verified default handle. */
     private String effectiveYt(Channel c) {
         if (prefs.contains(ytKey(c))) return prefs.getString(ytKey(c), "");
         String d = DEFAULT_YT.get(baseName(c.name).toLowerCase());
         return d == null ? "" : d;
     }
 
+    /**
+     * On every app open: for each news channel, fetch its /live page fresh,
+     * save the CURRENT video id, and mark the tile LIVE / not-live. A stream
+     * that ended since yesterday is replaced here automatically - the stored
+     * handle never changes, only the resolved id does.
+     */
+    private void refreshLiveStatus() {
+        if (liveCheckRunning) return;
+        liveCheckRunning = true;
+        final List<Channel> tiles = new ArrayList<Channel>(newsTiles);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (Channel c : tiles) {
+                    String yt = effectiveYt(c);
+                    if (yt.length() == 0 || yt.endsWith(".m3u8")) continue;
+                    String vid = YtResolver.liveVideoId(yt);
+                    SharedPreferences.Editor e = prefs.edit();
+                    e.putString("vid_" + baseName(c.name).toLowerCase(), vid == null ? "" : vid);
+                    e.putBoolean("live_" + baseName(c.name).toLowerCase(), vid != null);
+                    e.putLong("checked_" + baseName(c.name).toLowerCase(), System.currentTimeMillis());
+                    e.apply();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (SECTION_NEWS.equals(currentSection)) adapter.notifyDataSetChanged();
+                        }
+                    });
+                }
+                liveCheckRunning = false;
+            }
+        }).start();
+    }
+
+    private void playYouTube(final Channel c, final String liveUrl, final List<Channel> iptvList, final int iptvPos) {
+        Toast.makeText(this, "Finding the latest live for " + baseName(c.name) + "...", Toast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                // Fresh resolution on every tap - never a cached video id / HLS.
+                String m3u8 = YtResolver.resolveHls(liveUrl);
+                if (m3u8 != null && !YtResolver.isPlayableHls(m3u8)) {
+                    // Manifest was stale (stream restarted): resolve once more from scratch.
+                    m3u8 = YtResolver.resolveHls(liveUrl);
+                    if (m3u8 != null && !YtResolver.isPlayableHls(m3u8)) m3u8 = null;
+                }
+                if (m3u8 != null) {
+                    final String hls = m3u8;
+                    // Remember the id that actually worked, for the tile badge.
+                    String vid = YtResolver.liveVideoId(liveUrl);
+                    if (vid != null) {
+                        prefs.edit().putString("vid_" + baseName(c.name).toLowerCase(), vid)
+                                .putBoolean("live_" + baseName(c.name).toLowerCase(), true).apply();
+                    }
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Channel sc = new Channel();
+                            sc.name = baseName(c.name) + " - YouTube Live";
+                            sc.url = hls;
+                            sc.logo = c.logo;
+                            sc.ytLiveUrl = liveUrl;
+                            List<Channel> single = new ArrayList<Channel>();
+                            single.add(sc);
+                            AppData.playList = single;
+                            AppData.playIndex = 0;
+                            AppData.playTitle = SECTION_NEWS;
+                            startActivity(new Intent(MainActivity.this, PlayerActivity.class));
+                        }
+                    });
+                    return;
+                }
+                // Embed fallback still needs a CURRENT id, so fetch it fresh too.
+                final String videoId = YtResolver.liveVideoId(liveUrl);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (videoId != null) {
+                            AppData.playList = iptvList;
+                            AppData.playIndex = iptvPos;
+                            AppData.playTitle = currentSection;
+                            Intent i = new Intent(MainActivity.this, WebPlayerActivity.class);
+                            i.putExtra(WebPlayerActivity.EXTRA_VIDEO_ID, videoId);
+                            i.putExtra(WebPlayerActivity.EXTRA_TITLE, baseName(c.name) + " - YouTube Live");
+                            i.putExtra(WebPlayerActivity.EXTRA_ORIGINAL_URL, liveUrl);
+                            startActivity(i);
+                        } else if (c.url != null && c.url.length() > 0) {
+                            Toast.makeText(MainActivity.this, "YouTube live is offline - playing the TV stream", Toast.LENGTH_LONG).show();
+                            playIptv(iptvList, iptvPos);
+                        } else {
+                            openInYouTubeApp(liveUrl);
+                        }
+                    }
+                });
+            }
+        }).start();
+    }
+
     private void showNewsMenu(final Channel c, final int position) {
         final String yt = effectiveYt(c);
         final List<String> labels = new ArrayList<String>();
         final List<Integer> actions = new ArrayList<Integer>();
-        labels.add("▶ Play YouTube Live"); actions.add(0);
-        labels.add("▶ Play IPTV stream"); actions.add(1);
-        labels.add("✎ " + (yt.length() > 0 ? "Edit" : "Add") + " YouTube link"); actions.add(2);
-        if (yt.length() > 0) { labels.add("✕ Remove YouTube link"); actions.add(3); }
+        labels.add("Play YouTube Live (find latest)"); actions.add(0);
+        labels.add("Play TV stream"); actions.add(1);
+        labels.add((yt.length() > 0 ? "Edit" : "Add") + " YouTube channel link"); actions.add(2);
+        if (yt.length() > 0) { labels.add("Reset YouTube link to default"); actions.add(3); }
         String[] items = labels.toArray(new String[labels.size()]);
         new AlertDialog.Builder(this)
                 .setTitle(baseName(c.name))
@@ -600,7 +683,7 @@ public class MainActivity extends Activity {
                         int act = actions.get(which);
                         if (act == 0) {
                             if (yt.length() == 0) {
-                                Toast.makeText(MainActivity.this, "No YouTube link yet — add one first", Toast.LENGTH_LONG).show();
+                                Toast.makeText(MainActivity.this, "No YouTube link yet - add one first", Toast.LENGTH_LONG).show();
                                 editYtLink(c);
                             } else {
                                 playYouTube(c, yt, adapter.data, position);
@@ -610,9 +693,10 @@ public class MainActivity extends Activity {
                         } else if (act == 2) {
                             editYtLink(c);
                         } else if (act == 3) {
-                            prefs.edit().putString(ytKey(c), "").apply();
+                            prefs.edit().remove(ytKey(c)).apply();
                             adapter.notifyDataSetChanged();
-                            Toast.makeText(MainActivity.this, "YouTube link removed — this tile now plays IPTV", Toast.LENGTH_SHORT).show();
+                            refreshLiveStatus();
+                            Toast.makeText(MainActivity.this, "Reset to the built-in channel link", Toast.LENGTH_SHORT).show();
                         }
                     }
                 })
@@ -626,71 +710,23 @@ public class MainActivity extends Activity {
         input.setSelection(input.getText().length());
         input.setHint("https://www.youtube.com/@channel/live");
         new AlertDialog.Builder(this)
-                .setTitle("YouTube Live link — " + baseName(c.name))
-                .setMessage("Paste the channel's live page, a watch link, or a direct .m3u8. Saved on this TV only.")
+                .setTitle("YouTube channel - " + baseName(c.name))
+                .setMessage("Paste the CHANNEL page or its /live page (with the @handle). The app finds the current live itself, so a channel link never expires. A single video link works only until that stream ends.")
                 .setView(input)
                 .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        String val = input.getText().toString().trim();
+                        String val = YtResolver.normalizeToLiveUrl(input.getText().toString());
                         prefs.edit().putString(ytKey(c), val).apply();
                         adapter.notifyDataSetChanged();
+                        refreshLiveStatus();
                         Toast.makeText(MainActivity.this,
-                                val.length() > 0 ? "Saved. OK on this tile now plays YouTube." : "Cleared. This tile now plays IPTV.",
+                                val.length() > 0 ? "Saved: " + val : "Cleared. This tile now plays the TV stream.",
                                 Toast.LENGTH_LONG).show();
                     }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
-    }
-
-    private void playYouTube(final Channel c, final String link, final List<Channel> iptvList, final int iptvPos) {
-        Toast.makeText(this, "Opening YouTube live for " + baseName(c.name) + "…", Toast.LENGTH_SHORT).show();
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                // Best: pull the live stream and play it in the app's own player.
-                final String m3u8 = YtResolver.resolveHls(link);
-                if (m3u8 != null) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Channel sc = new Channel();
-                            sc.name = baseName(c.name) + " - YouTube Live";
-                            sc.url = m3u8;
-                            sc.logo = c.logo;
-                            List<Channel> single = new ArrayList<Channel>();
-                            single.add(sc);
-                            AppData.playList = single;
-                            AppData.playIndex = 0;
-                            AppData.playTitle = "YouTube Live";
-                            startActivity(new Intent(MainActivity.this, PlayerActivity.class));
-                        }
-                    });
-                    return;
-                }
-                // Next best: the official embedded player, still inside the app.
-                final String videoId = YtResolver.extractVideoId(link);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (videoId != null) {
-                            // IPTV context for the web player's escape hatch.
-                            AppData.playList = iptvList;
-                            AppData.playIndex = iptvPos;
-                            AppData.playTitle = currentCat;
-                            Intent i = new Intent(MainActivity.this, WebPlayerActivity.class);
-                            i.putExtra(WebPlayerActivity.EXTRA_VIDEO_ID, videoId);
-                            i.putExtra(WebPlayerActivity.EXTRA_TITLE, baseName(c.name) + " - YouTube Live");
-                            i.putExtra(WebPlayerActivity.EXTRA_ORIGINAL_URL, link);
-                            startActivity(i);
-                        } else {
-                            openInYouTubeApp(link);
-                        }
-                    }
-                });
-            }
-        }).start();
     }
 
     private void openInYouTubeApp(String link) {
@@ -702,7 +738,7 @@ public class MainActivity extends Activity {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(link)));
             } catch (ActivityNotFoundException e2) {
-                Toast.makeText(this, "Couldn't open that YouTube link — check it, or use the IPTV stream", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Could not open that YouTube link - check it, or use the TV stream", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -741,12 +777,26 @@ public class MainActivity extends Activity {
             Channel c = data.get(position);
             ImageView logo = (ImageView) v.findViewById(R.id.logo);
             TextView name = (TextView) v.findViewById(R.id.name);
-            if (HOME.equals(currentCat)) {
-                String label = baseName(c.name);
-                if (effectiveYt(c).length() > 0) label += "  ▶YT";
-                name.setText(label);
+            TextView badge = (TextView) v.findViewById(R.id.badge);
+            name.setText(baseName(c.name));
+            if (SECTION_NEWS.equals(currentSection)) {
+                String key = baseName(c.name).toLowerCase();
+                boolean checked = prefs.contains("live_" + key);
+                boolean live = prefs.getBoolean("live_" + key, false);
+                if (checked && live) {
+                    badge.setText("\u25CF LIVE  -  YouTube");
+                    badge.setTextColor(0xFFFF453A);
+                } else if (checked) {
+                    badge.setText("YouTube  -  checking / offline");
+                    badge.setTextColor(0xFF9A9AA3);
+                } else {
+                    badge.setText("YouTube Live");
+                    badge.setTextColor(0xFF9A9AA3);
+                }
             } else {
-                name.setText(c.name);
+                String g = c.groups.size() > 0 ? c.groups.get(0) : "";
+                badge.setText(g.length() > 0 ? qualityLabel(c) + "  -  " + g : qualityLabel(c));
+                badge.setTextColor(0xFF9A9AA3);
             }
             ImageLoader.load(logo, c.logo);
             return v;

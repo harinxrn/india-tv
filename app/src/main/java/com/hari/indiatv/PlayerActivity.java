@@ -10,6 +10,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -18,6 +19,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * v2 player: clean Apple-TV-style bottom panel (logo, LIVE badge, channel
+ * name, position, hints) that fades out, plus YouTube self-healing - if a
+ * YouTube HLS stream dies mid-play, the channel's latest live is resolved
+ * fresh and playback resumes instead of skipping / going dead.
+ */
 public class PlayerActivity extends Activity {
 
     private List<Channel> list;
@@ -26,20 +33,22 @@ public class PlayerActivity extends Activity {
     private SurfaceView surface;
     private SurfaceHolder holder;
     private ProgressBar buffering;
+    private TextView bufferingLabel;
+    private View panel;
     private TextView nowPlaying;
-    private TextView hint;
+    private TextView subInfo;
+    private ImageView channelLogo;
     private Handler handler = new Handler();
     private int errorStreak = 0;
+    private int ytRetry = 0;
     private boolean stopped = false;
     private boolean paused = false;
+    private boolean resolving = false;
 
     private final Runnable hideOverlay = new Runnable() {
         @Override
         public void run() {
-            if (!paused) {
-                nowPlaying.setVisibility(View.GONE);
-                hint.setVisibility(View.GONE);
-            }
+            if (!paused) panel.setVisibility(View.GONE);
         }
     };
 
@@ -56,8 +65,11 @@ public class PlayerActivity extends Activity {
         }
         surface = (SurfaceView) findViewById(R.id.surface);
         buffering = (ProgressBar) findViewById(R.id.buffering);
+        bufferingLabel = (TextView) findViewById(R.id.bufferingLabel);
+        panel = findViewById(R.id.playerPanel);
         nowPlaying = (TextView) findViewById(R.id.nowPlaying);
-        hint = (TextView) findViewById(R.id.hint);
+        subInfo = (TextView) findViewById(R.id.subInfo);
+        channelLogo = (ImageView) findViewById(R.id.channelLogo);
         holder = surface.getHolder();
         holder.addCallback(new SurfaceHolder.Callback() {
             @Override
@@ -84,6 +96,26 @@ public class PlayerActivity extends Activity {
         return h;
     }
 
+    private void showOverlay(long hideAfterMs) {
+        final Channel c = list.get(index);
+        nowPlaying.setText(displayName(c.name));
+        String section = AppData.playTitle != null && AppData.playTitle.length() > 0 ? AppData.playTitle : "Live TV";
+        String src = c.ytLiveUrl != null ? "YouTube Live" : "Live TV";
+        subInfo.setText(section + "  -  " + src + "  -  " + (index + 1) + " of " + list.size());
+        ImageLoader.load(channelLogo, c.logo);
+        panel.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(hideOverlay);
+        if (hideAfterMs > 0) handler.postDelayed(hideOverlay, hideAfterMs);
+    }
+
+    private static String displayName(String name) {
+        int p = name.indexOf(" (");
+        String b = p > 0 ? name.substring(0, p) : name;
+        int b2 = b.indexOf(" [");
+        if (b2 > 0) b = b.substring(0, b2);
+        return b.trim();
+    }
+
     private void play(int i) {
         if (list == null || list.isEmpty()) return;
         index = ((i % list.size()) + list.size()) % list.size();
@@ -91,12 +123,10 @@ public class PlayerActivity extends Activity {
         stopped = false;
         paused = false;
         releasePlayer();
-        nowPlaying.setText(c.name);
-        nowPlaying.setVisibility(View.VISIBLE);
-        hint.setVisibility(View.VISIBLE);
-        handler.removeCallbacks(hideOverlay);
-        handler.postDelayed(hideOverlay, 4000);
+        showOverlay(4500);
         buffering.setVisibility(View.VISIBLE);
+        bufferingLabel.setVisibility(View.VISIBLE);
+        bufferingLabel.setText("Loading " + displayName(c.name) + "...");
         try {
             mp = new MediaPlayer();
             mp.setDisplay(holder);
@@ -105,7 +135,9 @@ public class PlayerActivity extends Activity {
                 @Override
                 public void onPrepared(MediaPlayer player) {
                     errorStreak = 0;
+                    ytRetry = 0;
                     buffering.setVisibility(View.GONE);
+                    bufferingLabel.setVisibility(View.GONE);
                     player.start();
                 }
             });
@@ -113,13 +145,23 @@ public class PlayerActivity extends Activity {
                 @Override
                 public boolean onError(MediaPlayer player, int what, int extra) {
                     buffering.setVisibility(View.GONE);
-                    errorStreak++;
-                    if (errorStreak >= 12) {
-                        nowPlaying.setText(c.name + " — stream unavailable. Press ▲ for next channel.");
-                        nowPlaying.setVisibility(View.VISIBLE);
+                    bufferingLabel.setVisibility(View.GONE);
+                    // YouTube live HLS urls expire / rotate when a stream
+                    // restarts: re-resolve the channel's latest live first.
+                    if (c.ytLiveUrl != null && ytRetry < 2 && !resolving) {
+                        ytRetry++;
+                        resolveYouTubeAgain(c);
                         return true;
                     }
-                    Toast.makeText(PlayerActivity.this, "Couldn't play " + c.name + " — skipping", Toast.LENGTH_SHORT).show();
+                    errorStreak++;
+                    if (list.size() <= 1 || errorStreak >= 12) {
+                        nowPlaying.setText(displayName(c.name));
+                        subInfo.setText("Stream unavailable right now. Back to go home, or Up / Down for another channel.");
+                        panel.setVisibility(View.VISIBLE);
+                        handler.removeCallbacks(hideOverlay);
+                        return true;
+                    }
+                    Toast.makeText(PlayerActivity.this, "Could not play " + displayName(c.name) + " - skipping", Toast.LENGTH_SHORT).show();
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
@@ -129,11 +171,27 @@ public class PlayerActivity extends Activity {
                     return true;
                 }
             });
+            mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer player) {
+                    // A live stream that "completes" has ended - for YouTube,
+                    // that usually means a new live has already started.
+                    if (c.ytLiveUrl != null && ytRetry < 2 && !resolving) {
+                        ytRetry++;
+                        resolveYouTubeAgain(c);
+                    }
+                }
+            });
             mp.setOnInfoListener(new MediaPlayer.OnInfoListener() {
                 @Override
                 public boolean onInfo(MediaPlayer player, int what, int extra) {
-                    if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) buffering.setVisibility(View.VISIBLE);
-                    else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) buffering.setVisibility(View.GONE);
+                    if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+                        buffering.setVisibility(View.VISIBLE);
+                        bufferingLabel.setVisibility(View.VISIBLE);
+                    } else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
+                        buffering.setVisibility(View.GONE);
+                        bufferingLabel.setVisibility(View.GONE);
+                    }
                     return false;
                 }
             });
@@ -146,8 +204,41 @@ public class PlayerActivity extends Activity {
             mp.prepareAsync();
         } catch (Exception e) {
             buffering.setVisibility(View.GONE);
-            Toast.makeText(this, "Couldn't play " + c.name, Toast.LENGTH_SHORT).show();
+            bufferingLabel.setVisibility(View.GONE);
+            Toast.makeText(this, "Could not play " + displayName(c.name), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** Self-heal: get a fresh HLS for this channel's /live page and resume. */
+    private void resolveYouTubeAgain(final Channel c) {
+        resolving = true;
+        buffering.setVisibility(View.VISIBLE);
+        bufferingLabel.setVisibility(View.VISIBLE);
+        bufferingLabel.setText("Live link changed - finding the new stream...");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final String fresh = YtResolver.resolveHls(c.ytLiveUrl);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        resolving = false;
+                        if (stopped) return;
+                        if (fresh != null && fresh.length() > 0) {
+                            c.url = fresh;
+                            play(index);
+                        } else {
+                            nowPlaying.setText(displayName(c.name));
+                            subInfo.setText("YouTube live is offline right now. Press Back and try the TV stream for this channel.");
+                            panel.setVisibility(View.VISIBLE);
+                            handler.removeCallbacks(hideOverlay);
+                            buffering.setVisibility(View.GONE);
+                            bufferingLabel.setVisibility(View.GONE);
+                        }
+                    }
+                });
+            }
+        }).start();
     }
 
     private void fitSurface(int vw, int vh) {
@@ -169,14 +260,11 @@ public class PlayerActivity extends Activity {
             if (mp.isPlaying()) {
                 mp.pause();
                 paused = true;
-                nowPlaying.setVisibility(View.VISIBLE);
-                hint.setVisibility(View.VISIBLE);
-                handler.removeCallbacks(hideOverlay);
+                showOverlay(0);
             } else {
                 mp.start();
                 paused = false;
-                handler.removeCallbacks(hideOverlay);
-                handler.postDelayed(hideOverlay, 2500);
+                showOverlay(2500);
             }
         } catch (Exception ignored) {
         }
@@ -194,6 +282,10 @@ public class PlayerActivity extends Activity {
             case KeyEvent.KEYCODE_CHANNEL_DOWN:
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
                 play(index - 1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                showOverlay(3500);
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
