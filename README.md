@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="140" alt="Kerala Tv logo">
+  <img src="docs/Polished%20Kerala%20Tv%20logo.png" width="140" alt="Kerala Tv logo">
 </p>
 
 <h1 align="center">Kerala Tv</h1>
