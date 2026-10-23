@@ -75,14 +75,17 @@ The logo script uses the Montserrat fonts in `assets-img/fonts/` when present an
 
 ## Install
 
-Sideload the APK over ADB:
+Download `KeralaTv-v2.5.apk` from the [v2.5 release](https://github.com/harinxrn/kerala-tv/releases/tag/v2.5) and get it onto the TV any of these ways:
+
+- **File-transfer app (no cable needed):** send the APK from your phone or computer with an app like [LocalSend](https://localsend.org) or Send Files to TV — install the matching receiver app on the TV, send the file, then open it from the TV's file app and install. The TV will ask you to allow installs from that app the first time; say yes.
+- **ADB:**
 
 ```bash
 adb connect <tv-ip>:5555
 adb install KeralaTv-v2.5.apk
 ```
 
-or copy it to a USB drive and open it from the TV's file app.
+- **USB drive:** copy the APK to a USB stick, plug it into the TV, and open it from the TV's file app.
 
 ## How the YouTube playback works
 
