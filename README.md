@@ -1,4 +1,17 @@
-# Kerala Tv
+<p align="center">
+  <img src="docs/logo.svg" width="140" alt="Kerala Tv logo">
+</p>
+
+<h1 align="center">Kerala Tv</h1>
+
+<p align="center"><strong>Malayalam Live TV for Android TV</strong> — YouTube Live news channels plus free IPTV streams, with self-healing links and no clutter.</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Unlicense-blue" alt="License: Unlicense"></a>
+  <a href="https://github.com/harinxrn/kerala-tv/releases/tag/v2.5"><img src="https://img.shields.io/badge/release-v2.5-brightgreen" alt="Release: v2.5"></a>
+  <img src="https://img.shields.io/badge/platform-Android%20TV-green" alt="Platform: Android TV">
+  <img src="https://img.shields.io/badge/Android-5.0%2B-3DDC84" alt="Android 5.0+">
+</p>
 
 A minimal Android TV app for watching live Malayalam TV, built for the remote first. Channels come from the free [iptv-org](https://github.com/iptv-org/iptv) playlists and refresh inside the app, so the lists stay current without an app update.
 
