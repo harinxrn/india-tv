@@ -43,6 +43,14 @@ import java.util.Map;
  *     few seconds, not twelve.
  * If all attempts fail, the dialog offers the channel's IPTV stream or the
  * YouTube app (unchanged from v1.4).
+ *
+ * v2.5.2: age-gate auto-switch (Hari's ask, 2026-10-24). YouTube put an
+ * age restriction on Asianet News's live stream; a signed-out embed can
+ * NEVER play an age-restricted video, so retrying the other attempts is
+ * pointless. The probe now recognises the age-restriction page text on
+ * the raw embed attempts and, instead of ending on the failure dialog,
+ * the player announces it on the loading cover and switches to the
+ * channel's IPTV stream by itself after a short pause.
  */
 public class WebPlayerActivity extends Activity {
 
@@ -53,6 +61,7 @@ public class WebPlayerActivity extends Activity {
     private static final String PROBE_JS =
             "(function(){try{"
             + "var t=document.body?document.body.innerText:'';"
+            + "if(/age[-\\s]restrict/i.test(t))return 'AGE';"
             + "var m=t.match(/Error (1[0-9][0-9])/);"
             + "if(m)return 'ERR:'+m[1];"
             + "if(document.querySelector('.ytp-error'))return 'ERR:ytp';"
@@ -63,6 +72,8 @@ public class WebPlayerActivity extends Activity {
 
     private WebView web;
     private View cover;
+    private TextView statusView;
+    private boolean ageGate = false;
     private String videoId;
     private String originalUrl;
     private int attempt = 0;
@@ -88,6 +99,7 @@ public class WebPlayerActivity extends Activity {
         quality = getSharedPreferences("webplayer", MODE_PRIVATE)
                 .getString("quality", "hd1080");
         cover = findViewById(R.id.cover);
+        statusView = (TextView) findViewById(R.id.webStatus);
         TextView titleView = (TextView) findViewById(R.id.webTitle);
         titleView.setText(title == null ? "" : title);
 
@@ -146,6 +158,11 @@ public class WebPlayerActivity extends Activity {
                             if (value == null) value = "";
                             if (value.contains("PLAYING")) {
                                 onPlaying();
+                            } else if (value.contains("AGE")) {
+                                // Age-restricted stream: no signed-out
+                                // attempt can ever play this - switch to
+                                // the channel's TV stream instead.
+                                onAgeGate();
                             } else if (value.contains("ERR:")) {
                                 // Behind the cover, nobody sees this error -
                                 // just move on to the next attempt.
@@ -218,11 +235,45 @@ public class WebPlayerActivity extends Activity {
         startAttempt(0);
     }
 
+    /**
+     * v2.5.2: the stream is age-restricted on YouTube. No embed attempt
+     * can fix that (the player is signed out), so don't strand the user
+     * on a dialog: say what's happening on the loading cover and switch
+     * to the channel's IPTV stream automatically after a short pause.
+     * Falls back to the dialog when the channel has no TV stream.
+     */
+    private void onAgeGate() {
+        if (settled) return;
+        settled = true;
+        ageGate = true;
+        probeGen++; // pending probes are now stale - ignore them
+        if (AppData.playList != null && !AppData.playList.isEmpty()) {
+            if (statusView != null) {
+                statusView.setText("Age-restricted on YouTube - switching to TV stream...");
+            }
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (isFinishing()) return;
+                    startActivity(new Intent(WebPlayerActivity.this, PlayerActivity.class));
+                    finish();
+                }
+            }, 2200);
+        } else {
+            showFailureDialog();
+        }
+    }
+
     private void showFailureDialog() {
         settled = true;
         cover.setVisibility(View.GONE);
-        String msg = "YouTube won't play this channel inside the app"
-                + (lastError.length() > 0 ? " (error " + lastError + ")" : "") + ".";
+        String msg;
+        if (ageGate) {
+            msg = "YouTube has age-restricted this stream, so it can't play inside the app.";
+        } else {
+            msg = "YouTube won't play this channel inside the app"
+                    + (lastError.length() > 0 ? " (error " + lastError + ")" : "") + ".";
+        }
         AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle("YouTube blocked in-app play")
                 .setMessage(msg + "\n\nThe channel's TV stream still works:")
